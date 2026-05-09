@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Who Are You, Really</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap');
+
+:root {
+  --bg:      #f2efe9;
+  --surface: #f8f6f1;
+  --border:  #d8d4cb;
+  --text:    #1a1a1a;
+  --muted:   #7a7268;
+  --faint:   #bdb7ac;
+  --dim:     #e5e1d8;
+  --ink:     #201c18;
+  --red:     #7a1c1c;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 300;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* paper grain */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-size: 256px;
+  pointer-events: none; z-index: 0;
+  opacity: 0.7; mix-blend-mode: multiply;
+}
+
+.screen { display: none; position: relative; z-index: 1; }
+.screen.active { display: flex; }
+
+/* ── PROGRESS ── */
+.progress-wrap {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 1px; background: transparent; z-index: 100;
+}
+.progress-fill {
+  height: 100%; background: var(--ink);
+  transition: width 0.7s ease; width: 0%;
+}
+
+/* ── INTRO ── */
+#intro {
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(2.5rem, 7vw, 5.5rem);
+  max-width: 680px; margin: 0 auto; width: 100%;
+}
+
+.intro-top { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 3rem; }
+
+.intro-kicker {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.56rem; letter-spacing: 0.32em;
+  text-transform: uppercase; color: var(--faint);
+  margin-bottom: 2.5rem;
+}
+
+.intro-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.8rem, 8vw, 6rem);
+  line-height: 0.94; letter-spacing: -0.02em;
+  color: var(--ink); margin-bottom: 0;
+}
+
+.intro-title em { font-style: italic; color: var(--red); }
+
+.intro-bottom { padding-top: 2.5rem; border-top: 1px solid var(--dim); }
+
+.intro-body {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem; line-height: 2;
+  color: var(--muted); margin-bottom: 2.5rem;
+  max-width: 420px;
+}
+
+.begin-btn {
+  background: var(--ink); color: var(--bg);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem; letter-spacing: 0.24em;
+  text-transform: uppercase;
+  padding: 0.85rem 2rem; border: none;
+  cursor: pointer; transition: background 0.2s;
+  display: inline-block;
+}
+.begin-btn:hover { background: var(--red); }
+
+/* ── QUIZ ── */
+#quiz {
+  min-height: 100vh;
+  flex-direction: column; justify-content: center;
+  padding: clamp(3rem, 8vw, 6rem) clamp(1.5rem, 5vw, 4rem);
+  max-width: 660px; margin: 0 auto; width: 100%;
+}
+
+.q-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.52rem; letter-spacing: 0.3em;
+  color: var(--faint); text-transform: uppercase;
+  margin-bottom: 3.5rem; display: flex;
+  justify-content: space-between; align-items: center;
+}
+
+.phase-label { color: var(--border); }
+
+.question-text {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(1.2rem, 3vw, 1.75rem);
+  line-height: 1.4; color: var(--ink);
+  margin-bottom: 0.8rem;
+  opacity: 0; transform: translateY(10px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.question-text.visible { opacity: 1; transform: translateY(0); }
+
+.question-sub {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem; font-weight: 300;
+  font-style: italic; color: var(--muted);
+  margin-bottom: 2rem;
+  opacity: 0; transition: opacity 0.4s ease 0.12s;
+}
+.question-sub.visible { opacity: 1; }
+
+.answer-area {
+  opacity: 0; transform: translateY(5px);
+  transition: opacity 0.45s ease 0.08s, transform 0.45s ease 0.08s;
+}
+.answer-area.visible { opacity: 1; transform: translateY(0); }
+
+/* text */
+textarea {
+  width: 100%; background: transparent;
+  border: none; border-bottom: 1px solid var(--border);
+  color: var(--ink); font-family: 'DM Mono', monospace;
+  font-size: 0.8rem; font-weight: 300;
+  padding: 0.7rem 0; resize: none; outline: none;
+  line-height: 1.9; transition: border-color 0.3s;
+  min-height: 88px;
+}
+textarea:focus { border-bottom-color: var(--ink); }
+textarea::placeholder { color: var(--faint); font-style: italic; }
+
+.char-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.5rem; color: var(--faint);
+  letter-spacing: 0.1em; margin-top: 0.35rem;
+  min-height: 1em; transition: opacity 0.4s;
+}
+
+/* choices */
+.choices { display: flex; flex-direction: column; gap: 0.45rem; }
+
+.choice-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); font-family: 'DM Mono', monospace;
+  font-size: 0.7rem; font-weight: 300;
+  padding: 0.75rem 0.95rem; text-align: left;
+  cursor: pointer; transition: all 0.16s;
+  letter-spacing: 0.02em; line-height: 1.6;
+}
+.choice-btn:hover { border-color: var(--ink); color: var(--ink); }
+.choice-btn.selected { border-color: var(--ink); color: var(--ink); background: var(--dim); }
+
+/* scale */
+.scale-wrap { display: flex; align-items: center; gap: 1rem; margin: 0.6rem 0; }
+.scale-pole {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.56rem; color: var(--muted);
+  min-width: 75px; line-height: 1.5;
+}
+.scale-pole:last-child { text-align: right; }
+input[type=range] {
+  flex: 1; -webkit-appearance: none; appearance: none;
+  height: 1px; background: var(--border); outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 11px; height: 11px;
+  background: var(--ink); border-radius: 50%;
+}
+.scale-value {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.6rem; color: var(--ink);
+  text-align: center; margin-top: 0.3rem;
+}
+
+/* nav */
+.nav-wrap {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 3rem; padding-top: 1.2rem;
+  border-top: 1px solid var(--dim);
+}
+.nav-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); font-family: 'DM Mono', monospace;
+  font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase;
+  padding: 0.5rem 1rem; cursor: pointer; transition: all 0.18s;
+}
+.nav-btn:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+.nav-btn:disabled { opacity: 0.16; cursor: default; }
+.nav-btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.nav-btn.primary:hover { background: var(--red); border-color: var(--red); }
+.nav-btn.locked { opacity: 0.12; cursor: not-allowed; pointer-events: none; font-size: 0.48rem; }
+
+/* ── GENERATING ── */
+#generating {
+  min-height: 100vh; flex-direction: column; justify-content: center;
+  padding: clamp(2rem, 6vw, 5rem); max-width: 660px; margin: 0 auto; width: 100%;
+}
+.gen-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.52rem; letter-spacing: 0.35em;
+  color: var(--faint); text-transform: uppercase; margin-bottom: 2rem;
+}
+.dots { display: flex; gap: 0.45rem; }
+.dots span {
+  width: 4px; height: 4px; background: var(--ink); border-radius: 50%;
+  animation: dp 1.2s ease-in-out infinite;
+}
+.dots span:nth-child(2) { animation-delay: 0.2s; }
+.dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dp {
+  0%,100% { opacity: 0.18; transform: scale(0.75); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* ── RESULT ── */
+#result {
+  min-height: 100vh; flex-direction: column; justify-content: flex-start;
+  padding: clamp(4rem, 9vw, 7rem) clamp(1.5rem, 5vw, 4rem) 6rem;
+  max-width: 660px; margin: 0 auto; width: 100%;
+}
+
+/* Portrait arrives first — unframed, no label */
+.result-portrait {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem; line-height: 2.15;
+  color: var(--muted); white-space: pre-wrap;
+  opacity: 0; transition: opacity 1.4s ease;
+}
+.result-portrait.visible { opacity: 1; }
+
+/* Rule separates portrait from headline — system interpretation arrives second */
+.result-rule {
+  width: 24px; height: 1px; background: var(--red);
+  margin: 3rem 0; opacity: 0; transition: opacity 0.8s ease;
+}
+.result-rule.visible { opacity: 1; }
+
+.result-headline {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2rem, 5.5vw, 4rem);
+  line-height: 0.94; color: var(--ink);
+  opacity: 0; transition: opacity 0.8s ease;
+}
+.result-headline.visible { opacity: 1; }
+
+/* The unanswered question — returned, unresolved */
+.returned-question-wrap {
+  margin-top: 3.5rem;
+  opacity: 0; transition: opacity 0.8s ease;
+}
+.returned-question-wrap.visible { opacity: 1; }
+
+.returned-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.5rem; letter-spacing: 0.35em;
+  text-transform: uppercase; color: var(--faint);
+  margin-bottom: 1.2rem;
+}
+
+.returned-question {
+  font-family: 'DM Serif Display', serif;
+  font-style: italic;
+  font-size: clamp(1.05rem, 2.6vw, 1.45rem);
+  line-height: 1.5; color: var(--ink);
+}
+
+/* No answer invited. No button. The question just sits. */
+
+.result-footer {
+  margin-top: 4.5rem; padding-top: 1.5rem;
+  border-top: 1px solid var(--dim);
+  opacity: 0; transition: opacity 0.8s ease;
+  display: flex; flex-direction: column; gap: 0.8rem;
+}
+.result-footer.visible { opacity: 1; }
+
+.share-note {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.54rem; letter-spacing: 0.1em;
+  color: var(--faint); line-height: 1.8;
+}
+
+.restart-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); font-family: 'DM Mono', monospace;
+  font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 0.55rem 1.1rem; cursor: pointer;
+  transition: all 0.2s; align-self: flex-start;
+}
+.restart-btn:hover { border-color: var(--ink); color: var(--ink); }
+
+@media (max-width: 560px) {
+  .scale-pole { min-width: 52px; font-size: 0.5rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress-wrap"><div class="progress-fill" id="progressFill"></div></div>
+
+<!-- INTRO -->
+<div id="intro" class="screen active">
+  <div class="intro-top">
+    <div class="intro-kicker">An identity instrument · Grades 11–12</div>
+    <h1 class="intro-title">Who Are You,<br><em>Really</em></h1>
+  </div>
+  <div class="intro-bottom">
+    <p class="intro-body">
+      This is not a personality quiz.<br><br>
+      It will ask what you actually do —<br>
+      not what you intend, not who you think you are.<br><br>
+      Answer alone. Answer honestly.<br>
+      The result is yours.
+    </p>
+    <button class="begin-btn" onclick="startQuiz()">Begin</button>
+  </div>
+</div>
+
+<!-- QUIZ -->
+<div id="quiz" class="screen">
+  <div class="q-meta">
+    <span>Question <span id="qNum">1</span> of <span id="qTotal"></span></span>
+    <span class="phase-label" id="phaseLabel"></span>
+  </div>
+  <div class="question-text" id="questionText"></div>
+  <div class="question-sub" id="questionSub"></div>
+  <div class="answer-area" id="answerArea"></div>
+  <div class="nav-wrap">
+    <button class="nav-btn" id="prevBtn" onclick="prevQ()">← Back</button>
+    <button class="nav-btn primary" id="nextBtn" onclick="nextQ()">Next →</button>
+  </div>
+</div>
+
+<!-- GENERATING -->
+<div id="generating" class="screen">
+  <div class="gen-label">Reading</div>
+  <div class="dots"><span></span><span></span><span></span></div>
+</div>
+
+<!-- RESULT -->
+<div id="result" class="screen">
+  <div class="result-portrait" id="resultPortrait"></div>
+  <div class="result-rule" id="rule1"></div>
+  <div class="result-headline" id="resultHeadline"></div>
+  <div class="returned-question-wrap" id="returnedWrap">
+    <div class="returned-label">The question you didn't answer</div>
+    <div class="returned-question" id="returnedQuestion"></div>
+  </div>
+  <div class="result-footer" id="resultFooter">
+    <div class="share-note">This result is yours. You decide what, if anything, enters the room.</div>
+    <button class="restart-btn" onclick="restart()">Start again</button>
+  </div>
+</div>
+
+<script>
+// ── WORKER URL ──
+// Replace with your actual deployed Worker name once created in Cloudflare
+const PROXY = "https://anthropic-proxy.justin-steinmetz.workers.dev";
+
+// ── QUESTIONS ──
+// 15 questions, 6 phases. Each phase removes another place to hide.
+const questions = [
+
+  // PHASE 1 — Concrete behaviour (what you actually do)
+  {
+    phase: "Behaviour",
+    q: "What did you do last Saturday — in order, from when you woke up?",
+    sub: "Not what you wish you'd done. What actually happened.",
+    type: "text", placeholder: "", minLength: 40
+  },
+  {
+    phase: "Behaviour",
+    q: "What do you do when you have time alone and nothing you're supposed to do?",
+    sub: "Be specific. Not 'relax'.",
+    type: "text", placeholder: "", minLength: 20
+  },
+
+  // PHASE 2 — Values vs action
+  {
+    phase: "Values",
+    q: "Name something you believe strongly — politically, ethically, or socially.",
+    sub: null, type: "text", placeholder: "", minLength: 15
+  },
+  {
+    phase: "Values",
+    q: "What have you actually done about it in the last six months?",
+    sub: "Not what you intend to do. What you've done.",
+    type: "text", placeholder: "", minLength: 5
+  },
+  {
+    phase: "Values",
+    q: "You witness something unjust in public — not dramatic, just low-level and clear. What do you actually do?",
+    sub: null, type: "choice",
+    choices: [
+      "I intervene directly.",
+      "I say something small — not confrontational, but audible.",
+      "I notice but stay quiet.",
+      "I notice, decide it's not my place, and move on.",
+      "I often don't register it until later.",
+      "It depends entirely on who else is watching."
+    ]
+  },
+
+  // PHASE 3 — Social performance
+  {
+    phase: "Performance",
+    q: "Think of three different contexts — school, home, a group of friends outside school. What actually changes about you in each?",
+    sub: "Not 'I'm a bit quieter'. What changes.",
+    type: "text", placeholder: "", minLength: 40
+  },
+  {
+    phase: "Performance",
+    q: "When you adapt how you speak or present yourself depending on who's there — is that adaptation, or is it something else?",
+    sub: null, type: "text", placeholder: "", minLength: 20
+  },
+
+  // PHASE 4 — Origin
+  {
+    phase: "Origin",
+    q: "Name three things you care about. Then: where did each actually come from?",
+    sub: "Trace it. Don't stop at 'I just like it'.",
+    type: "text", placeholder: "", minLength: 60
+  },
+  {
+    phase: "Origin",
+    q: "What belief did you inherit that you have never seriously examined?",
+    sub: null, type: "text", placeholder: "not 'be kind'", minLength: 15
+  },
+
+  // PHASE 5 — Conformity
+  {
+    phase: "Conformity",
+    q: "Think of the last time you went along with something you disagreed with. What was it, and why?",
+    sub: null, type: "text", placeholder: "", minLength: 30
+  },
+  {
+    phase: "Conformity",
+    q: "When you resist something — a norm, an expectation, an authority — what's the honest reason?",
+    sub: null, type: "choice",
+    choices: [
+      "Because I've thought it through and I genuinely disagree.",
+      "Because it conflicts with something I actually care about.",
+      "Because resistance is part of how I see myself.",
+      "Because the people I want to impress also resist it.",
+      "I'm not sure — I just don't like being told what to do.",
+      "I don't really resist things."
+    ]
+  },
+  {
+    phase: "Conformity",
+    q: "How much of your 'individuality' — the ways you stand out — is actually shared with a specific group of people just like you?",
+    type: "scale",
+    left: "It's genuinely my own",
+    right: "It's mostly a group identity"
+  },
+
+  // PHASE 6 — Confrontation
+  {
+    phase: "Confrontation",
+    q: "Describe a moment when you were quietly unkind — not dramatically — and chose not to examine it.",
+    sub: null, type: "text", placeholder: "", minLength: 35
+  },
+  {
+    phase: "Confrontation",
+    q: "What do you know about yourself that you consistently avoid acting on?",
+    sub: null, type: "text", placeholder: "", minLength: 20
+  },
+  {
+    phase: "Confrontation",
+    q: "If the person you want to be met the person you actually are — what would they notice first?",
+    sub: null, type: "text", placeholder: "", minLength: 15
+  }
+];
+
+const TOTAL = questions.length;
+const LOCK_AFTER = 12; // Phase 6 starts at index 12
+
+let current = 0;
+let answers = new Array(TOTAL).fill('');
+let scaleValues = {};
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function startQuiz() {
+  show('quiz');
+  document.getElementById('qTotal').textContent = TOTAL;
+  renderQ(0);
+}
+
+function renderQ(index) {
+  current = index;
+  const q = questions[index];
+
+  document.getElementById('progressFill').style.width = ((index + 1) / TOTAL * 100) + '%';
+  document.getElementById('qNum').textContent = index + 1;
+  document.getElementById('phaseLabel').textContent = q.phase;
+
+  const locked = index >= LOCK_AFTER;
+  const prevBtn = document.getElementById('prevBtn');
+  if (locked) {
+    prevBtn.textContent = '—';
+    prevBtn.classList.add('locked');
+    prevBtn.disabled = true;
+  } else {
+    prevBtn.textContent = '← Back';
+    prevBtn.classList.remove('locked');
+    prevBtn.disabled = index === 0;
+  }
+
+  document.getElementById('nextBtn').textContent = index === TOTAL - 1 ? 'Finish →' : 'Next →';
+
+  const qText = document.getElementById('questionText');
+  const qSub  = document.getElementById('questionSub');
+  const area  = document.getElementById('answerArea');
+
+  qText.classList.remove('visible');
+  qSub.classList.remove('visible');
+  area.classList.remove('visible');
+
+  const delay = index === LOCK_AFTER ? 550 : 70;
+
+  setTimeout(() => {
+    qText.textContent = q.q;
+    if (q.sub) { qSub.textContent = q.sub; qSub.style.display = ''; }
+    else { qSub.textContent = ''; qSub.style.display = 'none'; }
+    buildAnswerArea(q, index, area);
+    setTimeout(() => {
+      qText.classList.add('visible');
+      if (q.sub) qSub.classList.add('visible');
+      area.classList.add('visible');
+    }, 35);
+  }, delay);
+}
+
+function buildAnswerArea(q, index, area) {
+  area.innerHTML = '';
+
+  if (q.type === 'text') {
+    const minL = q.minLength || 0;
+    const ta = document.createElement('textarea');
+    ta.rows = 4;
+    ta.placeholder = q.placeholder || '';
+    ta.value = answers[index] || '';
+
+    const hint = document.createElement('div');
+    hint.className = 'char-hint';
+    hint.textContent = (minL && ta.value.length < minL) ? 'keep going' : '';
+
+    ta.addEventListener('input', e => {
+      answers[index] = e.target.value;
+      if (minL) {
+        hint.textContent = e.target.value.length < minL ? 'keep going' : '';
+      }
+    });
+
+    area.appendChild(ta);
+    area.appendChild(hint);
+    setTimeout(() => ta.focus(), 100);
+
+  } else if (q.type === 'scale') {
+    const val = scaleValues[index] !== undefined ? scaleValues[index] : 5;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'scale-wrap';
+
+    const lp = document.createElement('div');
+    lp.className = 'scale-pole'; lp.textContent = q.left;
+
+    const slider = document.createElement('input');
+    slider.type = 'range'; slider.min = 1; slider.max = 10; slider.value = val;
+
+    const rp = document.createElement('div');
+    rp.className = 'scale-pole'; rp.textContent = q.right;
+
+    const disp = document.createElement('div');
+    disp.className = 'scale-value'; disp.textContent = val;
+
+    slider.addEventListener('input', e => {
+      scaleValues[index] = parseInt(e.target.value);
+      disp.textContent = e.target.value;
+      answers[index] = `${e.target.value}/10`;
+    });
+
+    wrap.appendChild(lp); wrap.appendChild(slider); wrap.appendChild(rp);
+    area.appendChild(wrap); area.appendChild(disp);
+    if (!answers[index]) answers[index] = `${val}/10`;
+
+  } else if (q.type === 'choice') {
+    const wrap = document.createElement('div');
+    wrap.className = 'choices';
+    q.choices.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn' + (answers[index] === c ? ' selected' : '');
+      btn.textContent = c;
+      btn.addEventListener('click', () => {
+        answers[index] = c;
+        wrap.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+      wrap.appendChild(btn);
+    });
+    area.appendChild(wrap);
+  }
+}
+
+function nextQ() {
+  const ta = document.getElementById('answerArea').querySelector('textarea');
+  if (ta) {
+    const q = questions[current];
+    const minL = q.minLength || 0;
+    if (minL && ta.value.trim().length < minL) {
+      const btn = document.getElementById('nextBtn');
+      const prev = btn.textContent;
+      btn.textContent = 'keep going';
+      setTimeout(() => { btn.textContent = prev; }, 800);
+      return;
+    }
+    answers[current] = ta.value;
+  }
+  if (current === TOTAL - 1) { generate(); }
+  else { renderQ(current + 1); }
+}
+
+function prevQ() {
+  if (current === 0 || current >= LOCK_AFTER) return;
+  renderQ(current - 1);
+}
+
+// ── GENERATE ──
+async function generate() {
+  show('generating');
+
+  const qaPairs = questions.map((q, i) => {
+    const val = (answers[i] || '').trim();
+    const cleaned = val.toLowerCase();
+    const isEmpty = !cleaned;
+    const isDeflect = ['idk','not sure','unsure','dunno','n/a','nothing','fine','ok','idk really'].includes(cleaned);
+    let tag = '';
+    if (isEmpty)    tag = ' [empty]';
+    else if (isDeflect) tag = ' [deflection]';
+    else if (cleaned.length < 8) tag = ' [minimal]';
+    return `Q${i+1} [${q.phase}]: ${q.q}\nA: ${val || '[no answer]'}${tag}`;
+  }).join('\n\n');
+
+  const prompt = `You have administered an identity questionnaire to a student aged 16–18. Here are their responses:\n\n${qaPairs}\n\nYour task is to write their portrait and identify the question they most conspicuously failed to answer.\n\nThis instrument is built on the principle that identity is a pattern of actions, inherited assumptions, and repeated compromises — not self-description. Your output must reflect that.\n\nRules:\n\n1. Every claim must be directly traceable to something they said, avoided, or answered minimally. If a sentence could apply to most people, delete it.\n\n2. The first two questions are your most reliable data. What someone actually did on Saturday, and what they do when alone, reveals more than any self-description. Use these.\n\n3. Read Q3 and Q4 together. What they believe vs. what they've done about it is the central tension of the instrument. Name the gap if it exists. Name the absence if Q4 is empty or minimal.\n\n4. The origin question (Q8) is critical. A student who cannot trace where their beliefs and tastes came from — or who claims they formed an opinion entirely independently — is telling you something important. So is one who traces it precisely.\n\n5. [empty], [deflection], and [minimal] on the confrontation questions (Q13, Q14, Q15) are primary data, not gaps to work around. Treat absence as the most honest answer they gave.\n\n6. Do not use psychological jargon. Not 'authentic', not 'journey', not 'growth', not 'resilience', not 'trauma'.\n\n7. Do not moralise. Do not reassure. Do not praise. Do not soften contradictions.\n\n8. Write directly to them as 'you'. The portrait is addressed to them.\n\n9. The portrait is an interpretation, not a summary. Begin with the single most concrete thing they revealed without knowing it.\n\n10. Do not begin the portrait with 'You'. Find a different entry.\n\nFor the unanswered question: identify the one question from the set that the student most conspicuously evaded, deflected, or answered with the least honesty relative to its weight. This is not necessarily the one marked [empty]. It may be a question they answered quickly, minimally, or with a deflection that performed honesty without delivering it. Return the question text exactly as written.\n\nOutput format — exactly, no deviations:\n\nPORTRAIT:\n[220–300 words. Specific. Behavioural. Grounded in their actual answers. No generalisation. States contradictions without resolving them. Does not end on a note of resolution or hope.]\n\nHEADLINE:\n[3–6 words. Names the central structural gap or pattern. Not a personality type. Not flattering. Not cruel. Precise.]\n\nUNANSWERED:\n[The exact text of the one question they most evaded. Nothing else. No commentary.]`;
+
+  try {
+    const response = await fetch(PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1200,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content.map(b => b.text || '').join('');
+
+    const portraitMatch  = text.match(/PORTRAIT:\s*([\s\S]+?)(?=HEADLINE:|$)/i);
+    const headlineMatch  = text.match(/HEADLINE:\s*(.+)/i);
+    const unansweredMatch = text.match(/UNANSWERED:\s*([\s\S]+)/i);
+
+    showResult(
+      portraitMatch   ? portraitMatch[1].trim()   : text,
+      headlineMatch   ? headlineMatch[1].trim()   : '—',
+      unansweredMatch ? unansweredMatch[1].trim() : ''
+    );
+
+  } catch(err) {
+    showResult('Something went wrong. Try again.', '—', '');
+  }
+}
+
+function showResult(portrait, headline, unanswered) {
+  show('result');
+
+  const el = id => document.getElementById(id);
+
+  el('resultPortrait').textContent = portrait;
+  el('resultHeadline').textContent = headline;
+  el('returnedQuestion').textContent = unanswered;
+
+  const hasUnanswered = !!unanswered;
+  el('returnedWrap').style.display = hasUnanswered ? '' : 'none';
+
+  // Sequence: portrait (unframed) → rule + headline → returned question → footer
+  // The portrait arrives without context. The headline arrives as interpretation.
+  // The returned question arrives last — and is not answered.
+  setTimeout(() => el('resultPortrait').classList.add('visible'), 300);
+
+  setTimeout(() => {
+    el('rule1').classList.add('visible');
+    el('resultHeadline').classList.add('visible');
+  }, 2200);
+
+  if (hasUnanswered) {
+    setTimeout(() => el('returnedWrap').classList.add('visible'), 3800);
+  }
+
+  setTimeout(() => el('resultFooter').classList.add('visible'), hasUnanswered ? 5200 : 3600);
+}
+
+function restart() {
+  answers = new Array(TOTAL).fill('');
+  scaleValues = {};
+  current = 0;
+  ['resultPortrait','rule1','resultHeadline','returnedWrap','resultFooter']
+    .forEach(id => document.getElementById(id).classList.remove('visible'));
+  show('intro');
+}
+</script>
+</body>
+</html>
